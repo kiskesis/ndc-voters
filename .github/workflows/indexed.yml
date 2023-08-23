@@ -12,7 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # Add your wallets here
       env:
         WALLETS: "kiskesis.near evangel.near haenko.near yonota.near johanga108.near"
 
@@ -33,3 +32,4 @@ jobs:
             author_name: "Vote parser"
             add: '*.txt --force'
             message: "Votes parse"
+
