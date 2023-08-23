@@ -3,25 +3,33 @@ name: Run PostgreSQL Query and Save Output
 on:
   workflow_dispatch:
   schedule:
-    - cron:  '* */1 * * *'
+    - cron: '* */1 * * *'
+
 jobs:
   run-query-and-save:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
-      
-      - name: Run Query and Save Output
-        env:
-            PGPASSWORD: 'nearprotocol'
-        id: query
-        run: psql -h mainnet.db.explorer.indexer.near.dev -U public_readonly -d mainnet_explorer -tAc "WITH votes as (SELECT receipt_predecessor_account_id as user,  (args->>'args_json')::json->>'candidate' as candidate, MIN(to_timestamp( receipt_included_in_block_timestamp / 1000000000 )) as time FROM action_receipt_actions WHERE receipt_receiver_account_id = 'nominations.ndc-gwg.near' AND action_kind = 'FUNCTION_CALL' AND args ->> 'method_name' = 'upvote' AND (args->>'args_json')::json->>'candidate' = 'vadim.near' GROUP BY receipt_predecessor_account_id, candidate) SELECT * FROM votes ORDER BY time DESC;" > output_votes.txt
-        shell: bash
 
-      - uses: EndBug/add-and-commit@v9 
-        with: 
-          author_name: "Vote parser"
-          add: 'output_votes.txt --force'
-          message: "Votes parse"
+      # Add your wallets here
+      env:
+        WALLETS: "kiskesis.near evangel.near haenko.near"
 
-          
+        - name: Loop over wallets
+          run: |
+            for wallet in $WALLETS; do
+              PGPASSWORD='nearprotocol' \
+                psql -h mainnet.db.explorer.indexer.near.dev \
+                -U public_readonly \
+                -d mainnet_explorer \
+                -tAc "WITH votes as (SELECT receipt_predecessor_account_id as user, (args->>'args_json')::json->>'candidate' as candidate, MIN(to_timestamp( receipt_included_in_block_timestamp / 1000000000 )) as time FROM action_receipt_actions WHERE receipt_receiver_account_id = 'nominations.ndc-gwg.near' AND action_kind = 'FUNCTION_CALL' AND args ->> 'method_name' = 'upvote' AND (args->>'args_json')::json->>'candidate' = '$wallet' GROUP BY receipt_predecessor_account_id, candidate) SELECT * FROM votes ORDER BY time DESC;" > "${wallet}_output_votes.txt"
+            done
+          shell: bash
+
+        - name: Add and commit files
+          uses: EndBug/add-and-commit@v9
+          with:
+            author_name: "Vote parser"
+            add: '*.txt --force'
+            message: "Votes parse"
