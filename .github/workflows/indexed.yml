@@ -12,24 +12,24 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      env:
-        WALLETS: "kiskesis.near evangel.near haenko.near yonota.near johanga108.near"
+      - name: Set up environment variables
+        run: echo "WALLETS=kiskesis.near evangel.near haenko.near yonota.near johanga108.near" >> $GITHUB_ENV
 
-        - name: Loop over wallets
-          run: |
-            for wallet in $WALLETS; do
-              PGPASSWORD='nearprotocol' \
-                psql -h mainnet.db.explorer.indexer.near.dev \
-                -U public_readonly \
-                -d mainnet_explorer \
-                -tAc "WITH votes as (SELECT receipt_predecessor_account_id as user, (args->>'args_json')::json->>'candidate' as candidate, MIN(to_timestamp( receipt_included_in_block_timestamp / 1000000000 )) as time FROM action_receipt_actions WHERE receipt_receiver_account_id = 'nominations.ndc-gwg.near' AND action_kind = 'FUNCTION_CALL' AND args ->> 'method_name' = 'upvote' AND (args->>'args_json')::json->>'candidate' = '$wallet' GROUP BY receipt_predecessor_account_id, candidate) SELECT * FROM votes ORDER BY time DESC;" > "${wallet}_output_votes.txt"
-            done
-          shell: bash
+      - name: Loop over wallets
+        run: |
+          wallets=($WALLETS)
+          for wallet in "${wallets[@]}"; do
+            PGPASSWORD='nearprotocol' \
+              psql -h mainnet.db.explorer.indexer.near.dev \
+              -U public_readonly \
+              -d mainnet_explorer \
+              -tAc "WITH votes as (SELECT receipt_predecessor_account_id as user, (args->>'args_json')::json->>'candidate' as candidate, MIN(to_timestamp( receipt_included_in_block_timestamp / 1000000000 )) as time FROM action_receipt_actions WHERE receipt_receiver_account_id = 'nominations.ndc-gwg.near' AND action_kind = 'FUNCTION_CALL' AND args ->> 'method_name' = 'upvote' AND (args->>'args_json')::json->>'candidate' = '$wallet' GROUP BY receipt_predecessor_account_id, candidate) SELECT * FROM votes ORDER BY time DESC;" > "${wallet}_output_votes.txt"
+          done
+        shell: bash
 
-        - name: Add and commit files
-          uses: EndBug/add-and-commit@v9
-          with:
-            author_name: "Vote parser"
-            add: '*.txt --force'
-            message: "Votes parse"
-
+      - name: Add and commit files
+        uses: EndBug/add-and-commit@v9
+        with:
+          author_name: "Vote parser"
+          add: '*.txt --force'
+          message: "Votes parse"
